@@ -62,7 +62,7 @@ async def help_command(update, context):
     help_text = """
     Доступные команды:
     /start - Начать диалог с ботом
-    /add <событие> <время> - Добавить событие в расписание. Например: /add кино завтра в 18:00
+    /add <событие> <время> - Добавить событие в расписание. Например: /add кино на завтра 18:00
     /show - Показать текущее расписание
     /delete <событие> - Удалить событие из расписания. Например: /delete Поход в кино
     /route - Начать процесс выбора начальной и конечной точек для расчета маршрута
@@ -235,6 +235,18 @@ async def add(update, context):
         await update.message.reply_text(
             'Пожалуйста, укажите событие в формате "/add <событие> предлог <время>".')
         return
+    elif len(context.args) == 2:
+        date = context.args[1]
+        event = context.args[0]
+        date = parse_datetime_with_relative_dates(date)
+        scheduled[event] = date
+
+        keyboard = [[InlineKeyboardButton("Show", callback_data='show')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(f'Событие "{event}" добавлено в расписание.', reply_markup=reply_markup)
+        # создаем задание (напоминание)
+        asyncio.Task(send_event_notification(context.user_data['chat_id'], event, date, context))
     else:
         for i in range(len(dictionary)):
             if dictionary[i - 1] in context.args:
@@ -343,16 +355,10 @@ async def to_location(update, context) -> int:
         #  когда from_location не определен
         update.message.reply_text("Не удалось определить начальное местоположение.")
         return
-
+    user_data['to_location'] = update.message.text
     coordinates1 = get_coordinates(user_data['from_location'])
     coordinates2 = get_coordinates((user_data['to_location']))
 
-    if coordinates1 or coordinates2 is None:
-        # когда функция get_coordinates не может получить координаты
-        update.message.reply_text("Не удалось получить координаты начального местоположения.")
-        return
-
-    user_data['to_location'] = update.message.text
     # координаты откуда
     latitude1, longitude1 = get_coordinates((user_data['from_location']))
     # координаты куда
